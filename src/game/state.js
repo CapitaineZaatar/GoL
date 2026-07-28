@@ -2,6 +2,7 @@ const STORAGE_KEY = 'hc_qte_demo_profile_v1';
 
 export const MOVEMENTS = {
   face_pull: { id: 'face_pull', label: 'Face-Pull (tirage horizontal épaule)' },
+  lateral_raise: { id: 'lateral_raise', label: 'Élévations latérales' },
 };
 
 export const UNLOCKS = [

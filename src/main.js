@@ -11,11 +11,11 @@ const canvas = document.getElementById('scene');
 const uiRoot = document.getElementById('ui-root');
 const state = new GameState();
 
-const { scene, gradientMap, resize, updateFrame, triggerCrowdReaction, kickCamera, render } = initScene(canvas);
+const { scene, gradientMap, resize, updateFrame, triggerCrowdReaction, kickCamera, render, setCameraPreset, cameraPresetCount } = initScene(canvas);
 
 const hercules = createHercules(gradientMap);
 hercules.group.position.set(-2, 0, 0);
-hercules.group.rotation.y = Math.PI / 2.5;
+hercules.group.rotation.y = Math.PI / 2;
 addOutline(hercules.group);
 scene.add(hercules.group);
 
@@ -28,6 +28,13 @@ scene.add(cerberus.group);
 const chain = buildChain(gradientMap);
 scene.add(chain.group);
 
+const gripChainLeft = buildChain(gradientMap, { linkCount: 7, radius: 0.075, tube: 0.032 });
+const gripChainRight = buildChain(gradientMap, { linkCount: 7, radius: 0.075, tube: 0.032 });
+gripChainLeft.group.visible = false;
+gripChainRight.group.visible = false;
+scene.add(gripChainLeft.group);
+scene.add(gripChainRight.group);
+
 function resizeAll() { resize(); }
 window.addEventListener('resize', resizeAll);
 resizeAll();
@@ -37,6 +44,10 @@ let poseTarget = 0;
 let lurch = 0;
 let retreat = 0;
 let impactPulse = 0;
+let crashPulse = 0;
+let repCounter = 0;
+
+function isLateral() { return state.config.movement === 'lateral_raise'; }
 
 function animate(now) {
   const dt = Math.min(48, now - (animate.last || now));
@@ -44,8 +55,6 @@ function animate(now) {
   updateFrame(dt);
 
   poseCurrent += (poseTarget - poseCurrent) * 0.18;
-  hercules.setPullPose(poseCurrent);
-  cerberus.strain(poseCurrent);
 
   lurch = Math.max(0, lurch - dt * 0.0022);
   cerberus.lurch(lurch);
@@ -57,11 +66,31 @@ function animate(now) {
     hercules.group.scale.setScalar(bounce);
   }
 
-  const handR = hercules.handWorldPosition('right');
-  const handL = hercules.handWorldPosition('left');
-  const mid = handR.add(handL).multiplyScalar(0.5);
-  const collarPos = cerberus.collarWorldPosition();
-  chain.update(mid, collarPos);
+  if (isLateral()) {
+    hercules.setLateralPose(poseCurrent);
+    let headSpreadValue = poseCurrent;
+    if (crashPulse > 0) {
+      crashPulse = Math.max(0, crashPulse - dt * 0.0035);
+      headSpreadValue = -Math.sin(crashPulse * Math.PI);
+      cerberus.flinchCenter(Math.sin(crashPulse * Math.PI));
+    }
+    cerberus.setHeadSpread(headSpreadValue);
+
+    const handL = hercules.handWorldPosition('left');
+    const handR = hercules.handWorldPosition('right');
+    const headL = cerberus.headWorldPosition('left');
+    const headR = cerberus.headWorldPosition('right');
+    gripChainLeft.update(handL, headL);
+    gripChainRight.update(handR, headR);
+  } else {
+    hercules.setPullPose(poseCurrent);
+    cerberus.strain(poseCurrent);
+    const handR = hercules.handWorldPosition('right');
+    const handL = hercules.handWorldPosition('left');
+    const mid = handR.add(handL).multiplyScalar(0.5);
+    const collarPos = cerberus.collarWorldPosition();
+    chain.update(mid, collarPos);
+  }
 
   render();
   requestAnimationFrame(animate);
@@ -71,7 +100,11 @@ requestAnimationFrame(animate);
 function clearUI() { uiRoot.innerHTML = ''; }
 
 function goMenu() {
-  poseTarget = 0; retreat = 0; lurch = 0;
+  poseTarget = 0; retreat = 0; lurch = 0; crashPulse = 0;
+  setCameraPreset(0);
+  chain.group.visible = true;
+  gripChainLeft.group.visible = false;
+  gripChainRight.group.visible = false;
   clearUI();
   renderMenu(uiRoot, state, {
     onStart: goConfig,
@@ -132,13 +165,22 @@ let repTimer = null;
 function goGame() {
   clearUI();
   state.startSession();
-  poseTarget = 0; retreat = 0; lurch = 0;
+  poseTarget = 0; retreat = 0; lurch = 0; crashPulse = 0; repCounter = 0;
   gameHud = renderGame(uiRoot, state);
   gameHud.setCounter(1, state.config.series, 0);
   gameHud.setGauge(0);
-  gameHud.setSubtitle('Hercule empoigne la chaîne… Cerbère s’éveille.');
   cerberus.restPose();
   hercules.restPose();
+  setCameraPreset(0);
+
+  const lateral = isLateral();
+  chain.group.visible = !lateral;
+  gripChainLeft.group.visible = lateral;
+  gripChainRight.group.visible = lateral;
+
+  gameHud.setSubtitle(lateral
+    ? 'Hercule empoigne les deux têtes de Cerbère… la troisième gronde au centre.'
+    : 'Hercule empoigne la chaîne… Cerbère s’éveille.');
 
   unbindPull = gameHud.bindPull({
     onPressStart: () => { if (qte) { qte.pressStart(); gameHud.setPressed(true); } },
@@ -151,7 +193,9 @@ function goGame() {
   });
 
   repTimer = setTimeout(() => {
-    gameHud.setSubtitle('« Hercule, retiens Cerbère ! Tire fort... mais sans à-coups ! »');
+    gameHud.setSubtitle(lateral
+      ? '« Hercule, écarte-les bien droit... puis frappe les têtes l’une contre l’autre ! »'
+      : '« Hercule, retiens Cerbère ! Tire fort... mais sans à-coups ! »');
     repTimer = setTimeout(startRep, 2600);
   }, 1400);
 }
@@ -161,6 +205,8 @@ function startRep() {
   qte.startRep();
   gameHud.setupZones(state.session.tolerance, SWEEP_MAX_ANGLE);
   gameHud.setSubtitle(`Série ${state.session.currentSeries} — Répétition ${state.session.currentRep}/${state.config.reps}`);
+  setCameraPreset(repCounter % cameraPresetCount);
+  repCounter += 1;
 }
 
 function qteFrame(dt) {
@@ -193,6 +239,10 @@ function handleRepResult(result) {
     impactPulse = result.quality === 'perfect' ? 1 : 0.5;
   }
 
+  if (isLateral()) {
+    crashPulse = 1;
+  }
+
   poseTarget = 0;
 
   repTimer = setTimeout(() => {
@@ -219,7 +269,8 @@ function goRecap() {
   if (unbindPull) { unbindPull(); unbindPull = null; }
   clearTimeout(repTimer);
   qte = null;
-  poseTarget = 0; lurch = 0;
+  poseTarget = 0; lurch = 0; crashPulse = 0;
+  setCameraPreset(0);
   const { entry, progressPct } = state.finishSession();
   renderRecap(uiRoot, state, { entry, progressPct }, {
     onExport: () => exportSession(),
