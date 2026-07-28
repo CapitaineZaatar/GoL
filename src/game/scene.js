@@ -185,6 +185,10 @@ export function initScene(canvas) {
     camera.updateProjectionMatrix();
   }
 
+  function render() {
+    renderer.render(scene, camera);
+  }
+
   let torchClock = 0;
   let camShake = 0;
 
@@ -227,6 +231,6 @@ export function initScene(canvas) {
 
   return {
     scene, camera, renderer, gradientMap,
-    resize, updateFrame, triggerCrowdReaction, kickCamera,
+    resize, updateFrame, triggerCrowdReaction, kickCamera, render,
   };
 }

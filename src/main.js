@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { GameState } from './game/state.js';
 import { initScene } from './game/scene.js';
 import { createHercules, createCerberus, buildChain } from './game/characters.js';
+import { addOutline } from './game/toon.js';
 import { QTEEngine, SWEEP_MAX_ANGLE } from './game/qte.js';
 import { renderMenu, renderConfig, renderGame, renderRecap, renderDashboard } from './game/ui.js';
 
@@ -10,16 +11,18 @@ const canvas = document.getElementById('scene');
 const uiRoot = document.getElementById('ui-root');
 const state = new GameState();
 
-const { scene, camera, renderer, gradientMap, resize, updateFrame, triggerCrowdReaction, kickCamera } = initScene(canvas);
+const { scene, gradientMap, resize, updateFrame, triggerCrowdReaction, kickCamera, render } = initScene(canvas);
 
 const hercules = createHercules(gradientMap);
 hercules.group.position.set(-1.7, 0, 0);
 hercules.group.rotation.y = Math.PI / 2.5;
+addOutline(hercules.group);
 scene.add(hercules.group);
 
 const cerberus = createCerberus(gradientMap);
 const cerberusBaseX = 1.9;
 cerberus.group.position.set(cerberusBaseX, 0, 0);
+addOutline(cerberus.group, { thickness: 0.05 });
 scene.add(cerberus.group);
 
 const chain = buildChain(gradientMap);
@@ -33,6 +36,7 @@ let poseCurrent = 0;
 let poseTarget = 0;
 let lurch = 0;
 let retreat = 0;
+let impactPulse = 0;
 
 function animate(now) {
   const dt = Math.min(48, now - (animate.last || now));
@@ -47,13 +51,19 @@ function animate(now) {
   cerberus.lurch(lurch);
   cerberus.group.position.x = cerberusBaseX + retreat * 0.85;
 
+  if (impactPulse > 0) {
+    impactPulse = Math.max(0, impactPulse - dt * 0.006);
+    const bounce = 1 + Math.sin(impactPulse * Math.PI) * 0.06;
+    hercules.group.scale.setScalar(bounce);
+  }
+
   const handR = hercules.handWorldPosition('right');
   const handL = hercules.handWorldPosition('left');
   const mid = handR.add(handL).multiplyScalar(0.5);
   const collarPos = cerberus.collarWorldPosition();
   chain.update(mid, collarPos);
 
-  renderer.render(scene, camera);
+  render();
   requestAnimationFrame(animate);
 }
 requestAnimationFrame(animate);
@@ -180,6 +190,7 @@ function handleRepResult(result) {
   } else {
     triggerCrowdReaction('cheer');
     kickCamera(result.quality === 'perfect' ? 1.1 : 0.5);
+    impactPulse = result.quality === 'perfect' ? 1 : 0.5;
   }
 
   poseTarget = 0;
