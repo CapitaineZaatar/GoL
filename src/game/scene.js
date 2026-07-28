@@ -99,12 +99,13 @@ export function initScene(canvas) {
   const scene = new THREE.Scene();
   const skyTex = createSkyTexture();
   scene.background = skyTex;
-  scene.fog = new THREE.Fog(0x241238, 14, 34);
+  scene.fog = new THREE.Fog(0x241238, 19, 38);
 
-  const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
-  const camBase = new THREE.Vector3(0, 2.4, 9.2);
+  const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+  const camBase = new THREE.Vector3(0.6, 3.1, 14.5);
+  const camTarget = new THREE.Vector3(0.6, 1.9, 0);
   camera.position.copy(camBase);
-  camera.lookAt(0, 1.4, 0);
+  camera.lookAt(camTarget);
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -213,10 +214,10 @@ export function initScene(canvas) {
         camBase.y + (Math.random() - 0.5) * camShake * 0.15,
         camBase.z,
       );
-      camera.lookAt(0, 1.4, 0);
+      camera.lookAt(camTarget);
     } else if (!camera.position.equals(camBase)) {
       camera.position.lerp(camBase, 0.15);
-      camera.lookAt(0, 1.4, 0);
+      camera.lookAt(camTarget);
     }
   }
 

@@ -33,23 +33,23 @@ export function createHercules(gradientMap) {
   abs.castShadow = true;
   torsoPivot.add(abs);
 
-  const chest = new THREE.Mesh(new THREE.CapsuleGeometry(0.52, 0.24, 4, 8), skin);
-  chest.scale.set(1.34, 1, 0.92);
-  chest.position.y = 0.7;
+  const chest = new THREE.Mesh(new THREE.CapsuleGeometry(0.42, 0.24, 4, 8), skin);
+  chest.scale.set(1.15, 1, 0.86);
+  chest.position.y = 0.66;
   chest.castShadow = true;
   torsoPivot.add(chest);
 
   [-1, 1].forEach((s) => {
-    const lat = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 8), skin);
-    lat.scale.set(0.85, 1.3, 0.75);
-    lat.position.set(s * 0.5, 0.42, -0.05);
+    const lat = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), skin);
+    lat.scale.set(0.7, 1.15, 0.62);
+    lat.position.set(s * 0.42, 0.4, -0.04);
     lat.castShadow = true;
     torsoPivot.add(lat);
   });
 
-  const traps = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8), skin);
-  traps.scale.set(1.5, 0.55, 0.85);
-  traps.position.y = 0.9;
+  const traps = new THREE.Mesh(new THREE.SphereGeometry(0.26, 10, 8), skin);
+  traps.scale.set(1.25, 0.5, 0.8);
+  traps.position.y = 0.88;
   traps.castShadow = true;
   torsoPivot.add(traps);
 
@@ -179,22 +179,26 @@ export function createCerberus(gradientMap) {
   const group = new THREE.Group();
   group.rotation.y = Math.PI / 2;
 
+  const body = new THREE.Group();
+  body.scale.setScalar(2);
+  group.add(body);
+
   const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.46, 0.85, 4, 8), furDark);
   torso.rotation.z = Math.PI / 2;
   torso.position.y = 0.72;
   torso.castShadow = true;
-  group.add(torso);
+  body.add(torso);
 
   const tail = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.6, 8), furDark);
   tail.position.set(0, 0.95, -0.7);
   tail.rotation.x = Math.PI / 2.6;
-  group.add(tail);
+  body.add(tail);
 
   for (let i = 0; i < 5; i += 1) {
     const spike = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.22 - i * 0.02, 6), furDark);
     spike.position.set(0, 1.06, 0.3 - i * 0.24);
     spike.rotation.x = -0.35;
-    group.add(spike);
+    body.add(spike);
   }
 
   function buildLeg(x, z) {
@@ -202,7 +206,7 @@ export function createCerberus(gradientMap) {
     leg.position.set(x, 0.36, z);
     leg.rotation.z = x > 0 ? -0.12 : 0.12;
     leg.castShadow = true;
-    group.add(leg);
+    body.add(leg);
     return leg;
   }
   buildLeg(0.3, 0.36);
@@ -212,7 +216,7 @@ export function createCerberus(gradientMap) {
 
   const neckBase = new THREE.Group();
   neckBase.position.set(0, 1.05, 0.42);
-  group.add(neckBase);
+  body.add(neckBase);
 
   function buildHead(offsetAngle, scale) {
     const neckPivot = new THREE.Group();
@@ -262,7 +266,7 @@ export function createCerberus(gradientMap) {
 
   const collarAnchor = new THREE.Object3D();
   collarAnchor.position.set(0, 1.05, 0.55);
-  group.add(collarAnchor);
+  body.add(collarAnchor);
 
   const collar = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.03, 6, 12), toonMaterial('#4a4a4a', gradientMap));
   collar.rotation.x = Math.PI / 2;
@@ -293,12 +297,12 @@ export function createCerberus(gradientMap) {
   };
 }
 
-export function buildChain(gradientMap, linkCount = 9) {
-  const mat = toonMaterial('#5a5a5a', gradientMap);
+export function buildChain(gradientMap, linkCount = 7) {
+  const mat = toonMaterial('#6a6a6a', gradientMap);
   const group = new THREE.Group();
   const links = [];
   for (let i = 0; i < linkCount; i += 1) {
-    const link = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.017, 6, 10), mat);
+    const link = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.045, 8, 12), mat);
     link.castShadow = true;
     group.add(link);
     links.push(link);
@@ -308,14 +312,15 @@ export function buildChain(gradientMap, linkCount = 9) {
     const dir = new THREE.Vector3().subVectors(pointB, pointA);
     const dist = dir.length();
     dir.normalize();
-    const sagAmount = Math.min(0.35, dist * 0.12);
+    const yaw = Math.atan2(dir.x, dir.z);
+    const sagAmount = Math.min(0.4, dist * 0.1);
     for (let i = 0; i < links.length; i += 1) {
       const t = i / (links.length - 1);
       const sag = Math.sin(t * Math.PI) * sagAmount;
       const p = new THREE.Vector3().lerpVectors(pointA, pointB, t);
       p.y -= sag;
       links[i].position.copy(p);
-      links[i].rotation.set(t * Math.PI * 0.5, Math.atan2(dir.x, dir.z), 0);
+      links[i].rotation.set(i % 2 === 0 ? 0 : Math.PI / 2, yaw, 0);
     }
   }
 
