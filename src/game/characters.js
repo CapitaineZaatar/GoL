@@ -144,6 +144,7 @@ export function createHercules(gradientMap) {
     restPose() {
       [leftArm, rightArm].forEach((arm) => {
         arm.shoulder.rotation.x = 0.1;
+        arm.shoulder.rotation.z = 0;
         arm.elbow.rotation.x = 0.2;
       });
       torsoPivot.rotation.x = 0;
@@ -152,10 +153,22 @@ export function createHercules(gradientMap) {
       const c = Math.min(1, Math.max(0, t));
       [leftArm, rightArm].forEach((arm) => {
         arm.shoulder.rotation.x = 0.1 - c * 2.1;
+        arm.shoulder.rotation.z = 0;
         arm.elbow.rotation.x = 0.2 + c * 1.3;
       });
       torsoPivot.rotation.x = -c * 0.22;
       hips.position.z = c * 0.12;
+    },
+    setLateralPose(t) {
+      const c = Math.min(1, Math.max(0, t));
+      const sides = [-1, 1];
+      [leftArm, rightArm].forEach((arm, i) => {
+        arm.shoulder.rotation.z = sides[i] * c * (Math.PI / 2) * 0.9;
+        arm.shoulder.rotation.x = 0.05;
+        arm.elbow.rotation.x = 0.12;
+      });
+      torsoPivot.rotation.x = c * 0.08;
+      hips.position.z = 0;
     },
     handWorldPosition(side, out = new THREE.Vector3()) {
       const arm = side === 'left' ? leftArm : rightArm;
@@ -274,12 +287,17 @@ export function createCerberus(gradientMap) {
 
   group.traverse((obj) => { if (obj.isMesh) obj.castShadow = true; });
 
+  const SIDE_HEAD_REST_ANGLE = 0.72;
+  const SIDE_HEAD_MAX_ANGLE = 1.4;
+
   return {
     group, collarAnchor,
     heads: [centerHead, leftHead, rightHead],
     restPose() {
       group.position.z = 0;
       this.heads.forEach((h) => { h.neckPivot.rotation.x = 0; });
+      leftHead.neckPivot.rotation.y = -SIDE_HEAD_REST_ANGLE;
+      rightHead.neckPivot.rotation.y = SIDE_HEAD_REST_ANGLE;
     },
     strain(t) {
       const c = Math.min(1, Math.max(0, t));
@@ -287,8 +305,25 @@ export function createCerberus(gradientMap) {
         h.neckPivot.rotation.x = -0.15 - c * 0.3 + Math.sin(Date.now() * 0.004 + i) * 0.03;
       });
     },
+    /** v in [-1, 1] : -1 = têtes écrasées vers le centre, 0 = repos, 1 = écartement maximal. */
+    setHeadSpread(v) {
+      const clamped = Math.max(-1, Math.min(1, v));
+      const angle = clamped >= 0
+        ? SIDE_HEAD_REST_ANGLE + clamped * (SIDE_HEAD_MAX_ANGLE - SIDE_HEAD_REST_ANGLE)
+        : SIDE_HEAD_REST_ANGLE * (1 + clamped);
+      leftHead.neckPivot.rotation.y = -angle;
+      rightHead.neckPivot.rotation.y = angle;
+    },
+    flinchCenter(intensity) {
+      centerHead.neckPivot.rotation.x = -0.1 - Math.max(0, intensity) * 0.55;
+    },
     lurch(intensity) {
       group.position.z = intensity * 0.35;
+    },
+    headWorldPosition(side, out = new THREE.Vector3()) {
+      const h = side === 'left' ? leftHead : rightHead;
+      h.headGroup.getWorldPosition(out);
+      return out;
     },
     collarWorldPosition(out = new THREE.Vector3()) {
       collarAnchor.getWorldPosition(out);
@@ -297,12 +332,12 @@ export function createCerberus(gradientMap) {
   };
 }
 
-export function buildChain(gradientMap, linkCount = 7) {
+export function buildChain(gradientMap, { linkCount = 13, radius = 0.1, tube = 0.045 } = {}) {
   const mat = toonMaterial('#6a6a6a', gradientMap);
   const group = new THREE.Group();
   const links = [];
   for (let i = 0; i < linkCount; i += 1) {
-    const link = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.045, 8, 12), mat);
+    const link = new THREE.Mesh(new THREE.TorusGeometry(radius, tube, 8, 12), mat);
     link.castShadow = true;
     group.add(link);
     links.push(link);

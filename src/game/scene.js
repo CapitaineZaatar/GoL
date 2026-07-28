@@ -102,10 +102,25 @@ export function initScene(canvas) {
   scene.fog = new THREE.Fog(0x241238, 19, 38);
 
   const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
-  const camBase = new THREE.Vector3(0.6, 3.1, 14.5);
-  const camTarget = new THREE.Vector3(0.6, 1.9, 0);
+
+  const cameraPresets = [
+    { pos: [0.6, 3.1, 14.5], target: [0.6, 1.9, 0] },
+    { pos: [-3.4, 2.1, 3], target: [-1.4, 1.9, -0.6] },
+    { pos: [8.4, 2.6, 2.5], target: [0.2, 1.9, -0.8] },
+    { pos: [2.6, 1.4, 6], target: [3.2, 2.9, -1] },
+  ];
+  const camBase = new THREE.Vector3(...cameraPresets[0].pos);
+  const camTarget = new THREE.Vector3(...cameraPresets[0].target);
   camera.position.copy(camBase);
   camera.lookAt(camTarget);
+
+  function setCameraPreset(index) {
+    const preset = cameraPresets[((index % cameraPresets.length) + cameraPresets.length) % cameraPresets.length];
+    camBase.set(...preset.pos);
+    camTarget.set(...preset.target);
+    camera.position.copy(camBase);
+    camera.lookAt(camTarget);
+  }
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -233,5 +248,6 @@ export function initScene(canvas) {
   return {
     scene, camera, renderer, gradientMap,
     resize, updateFrame, triggerCrowdReaction, kickCamera, render,
+    setCameraPreset, cameraPresetCount: cameraPresets.length,
   };
 }
