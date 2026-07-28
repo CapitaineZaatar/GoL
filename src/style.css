@@ -279,6 +279,64 @@ html, body {
   text-align: right;
 }
 
+.dashboard-link {
+  display: block;
+  width: 100%;
+  background: none;
+  border: 1px dashed rgba(232,193,104,0.4);
+  color: var(--gold);
+  font-family: inherit;
+  font-size: 0.85rem;
+  padding: 0.6rem;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-bottom: 0.4rem;
+  transition: background 0.15s ease;
+}
+
+.dashboard-link:hover { background: rgba(232,193,104,0.1); }
+
+.dashboard-panel { width: min(680px, 92vw); }
+
+.score-chart {
+  width: 100%;
+  height: 140px;
+  display: block;
+  margin-bottom: 1rem;
+}
+
+.history-table-wrap {
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid rgba(232,193,104,0.25);
+  border-radius: 8px;
+  margin-bottom: 1.2rem;
+}
+
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.history-table th, .history-table td {
+  padding: 0.45rem 0.6rem;
+  text-align: left;
+  border-bottom: 1px solid rgba(232,193,104,0.15);
+}
+
+.history-table th {
+  color: var(--gold);
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  position: sticky;
+  top: 0;
+  background: #241329;
+}
+
+.hint { opacity: 0.75; font-size: 0.9rem; }
+
 /* ---------- Game HUD ---------- */
 
 .game-screen { justify-content: space-between; padding: 3vh 3vw; }

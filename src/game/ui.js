@@ -32,7 +32,7 @@ export function renderMenu(container, state, { onStart, onSettings, onQuit }) {
   screen.querySelector('#btn-quit').addEventListener('click', onQuit);
 }
 
-export function renderConfig(container, state, { onBack, onConfirm }) {
+export function renderConfig(container, state, { onBack, onConfirm, onDashboard }) {
   container.innerHTML = '';
   const cfg = state.config;
   const screen = el(`
@@ -76,6 +76,8 @@ export function renderConfig(container, state, { onBack, onConfirm }) {
 
         <div class="tolerance-note" id="tolerance-note"></div>
 
+        <button type="button" class="dashboard-link" id="btn-dashboard">📊 Voir l'historique des séances (${state.profile.history.length})</button>
+
         <div class="panel-actions">
           <button class="brawl-btn secondary" id="btn-back">Retour</button>
           <button class="brawl-btn" id="btn-confirm">Valider &amp; commencer</button>
@@ -85,6 +87,10 @@ export function renderConfig(container, state, { onBack, onConfirm }) {
     </div>
   `);
   container.appendChild(screen);
+
+  if (onDashboard) {
+    screen.querySelector('#btn-dashboard').addEventListener('click', onDashboard);
+  }
 
   const noteEl = screen.querySelector('#tolerance-note');
   function refreshNote() {
@@ -293,6 +299,110 @@ export function renderRecap(container, state, { entry, progressPct }, { onExport
   screen.querySelector('#btn-export').addEventListener('click', onExport);
   screen.querySelector('#btn-menu').addEventListener('click', onMenu);
   screen.querySelector('#btn-replay').addEventListener('click', onReplay);
+}
+
+function drawScoreChart(canvas, history) {
+  const ctx = canvas.getContext('2d');
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = canvas.clientWidth;
+  const h = canvas.clientHeight;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, w, h);
+
+  if (history.length === 0) return;
+
+  const pad = { l: 34, r: 12, t: 12, b: 22 };
+  const plotW = w - pad.l - pad.r;
+  const plotH = h - pad.t - pad.b;
+  const maxScore = Math.max(10, ...history.map((e) => e.score));
+
+  ctx.strokeStyle = 'rgba(232,193,104,0.25)';
+  ctx.lineWidth = 1;
+  ctx.font = '10px Georgia';
+  ctx.fillStyle = 'rgba(240,226,192,0.7)';
+  for (let i = 0; i <= 4; i += 1) {
+    const y = pad.t + plotH * (1 - i / 4);
+    ctx.beginPath();
+    ctx.moveTo(pad.l, y);
+    ctx.lineTo(w - pad.r, y);
+    ctx.stroke();
+    ctx.fillText(Math.round((maxScore * i) / 4), 2, y + 3);
+  }
+
+  const points = history.map((entry, i) => {
+    const x = history.length === 1 ? pad.l + plotW / 2 : pad.l + (i / (history.length - 1)) * plotW;
+    const y = pad.t + plotH * (1 - entry.score / maxScore);
+    return { x, y };
+  });
+
+  ctx.strokeStyle = '#e8c168';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  points.forEach((p, i) => { if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); });
+  ctx.stroke();
+
+  points.forEach((p) => {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffe6a3';
+    ctx.fill();
+  });
+}
+
+export function renderDashboard(container, state, { onBack, onExportCSV }) {
+  container.innerHTML = '';
+  const history = state.profile.history;
+  const totalSessions = history.length;
+  const avgScore = totalSessions ? Math.round(history.reduce((s, e) => s + e.score, 0) / totalSessions) : 0;
+  const bestScore = totalSessions ? Math.max(...history.map((e) => e.score)) : 0;
+
+  const rows = history.slice().reverse().slice(0, 12).map((entry) => {
+    const d = new Date(entry.date);
+    const dateStr = `${d.toLocaleDateString('fr-FR')} ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
+    return `<tr><td>${dateStr}</td><td>${entry.score}</td><td>${entry.completedReps}/${entry.totalReps}</td><td>${entry.config.loadKg} kg</td><td>${entry.config.shoulderPain ? 'Oui' : 'Non'}</td></tr>`;
+  }).join('');
+
+  const screen = el(`
+    <div class="screen config-screen">
+      <div class="panel dashboard-panel">
+        <h2>Espace Kinésithérapeute</h2>
+        <div class="kicker">Historique et progression du patient</div>
+
+        <div class="recap-stats" style="margin-bottom:1.2rem">
+          <div class="stat"><span class="n">${totalSessions}</span><span class="l">Séances</span></div>
+          <div class="stat"><span class="n">${state.level()}</span><span class="l">Niveau patient</span></div>
+          <div class="stat"><span class="n">${avgScore}</span><span class="l">Score moyen</span></div>
+          <div class="stat"><span class="n">${bestScore}</span><span class="l">Meilleur score</span></div>
+        </div>
+
+        ${totalSessions ? '<canvas id="score-chart" class="score-chart"></canvas>' : '<p class="hint">Aucune séance enregistrée pour l’instant.</p>'}
+
+        ${totalSessions ? `
+        <div class="history-table-wrap">
+          <table class="history-table">
+            <thead><tr><th>Date</th><th>Score</th><th>Reps</th><th>Charge</th><th>Douleur</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>` : ''}
+
+        <div class="panel-actions">
+          <button class="brawl-btn secondary" id="btn-export-csv" ${totalSessions ? '' : 'disabled'}>Exporter CSV</button>
+          <button class="brawl-btn" id="btn-dash-back">Retour</button>
+        </div>
+      </div>
+    </div>
+  `);
+  container.appendChild(screen);
+
+  if (totalSessions) {
+    const canvas = screen.querySelector('#score-chart');
+    requestAnimationFrame(() => drawScoreChart(canvas, history));
+  }
+
+  screen.querySelector('#btn-dash-back').addEventListener('click', onBack);
+  screen.querySelector('#btn-export-csv').addEventListener('click', onExportCSV);
 }
 
 export { qualityLabel };

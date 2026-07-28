@@ -123,4 +123,28 @@ export class GameState {
     if (!entry) return null;
     return JSON.stringify(entry, null, 2);
   }
+
+  exportHistoryCSV() {
+    const header = 'date,score,completedReps,totalReps,mouvement,chargeKg,series,repsParSerie,douleurEpaule,parfaits,bons,acceptables,rates';
+    const rows = this.profile.history.map((entry) => {
+      const tally = { perfect: 0, good: 0, acceptable: 0, bad: 0 };
+      entry.repsLog.forEach((r) => { tally[r.quality] = (tally[r.quality] || 0) + 1; });
+      return [
+        new Date(entry.date).toISOString(),
+        entry.score,
+        entry.completedReps,
+        entry.totalReps,
+        entry.config.movement,
+        entry.config.loadKg,
+        entry.config.series,
+        entry.config.reps,
+        entry.config.shoulderPain,
+        tally.perfect,
+        tally.good,
+        tally.acceptable,
+        tally.bad,
+      ].join(',');
+    });
+    return [header, ...rows].join('\n');
+  }
 }

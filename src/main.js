@@ -4,7 +4,7 @@ import { GameState } from './game/state.js';
 import { initScene } from './game/scene.js';
 import { createHercules, createCerberus, buildChain } from './game/characters.js';
 import { QTEEngine, SWEEP_MAX_ANGLE } from './game/qte.js';
-import { renderMenu, renderConfig, renderGame, renderRecap } from './game/ui.js';
+import { renderMenu, renderConfig, renderGame, renderRecap, renderDashboard } from './game/ui.js';
 
 const canvas = document.getElementById('scene');
 const uiRoot = document.getElementById('ui-root');
@@ -88,7 +88,30 @@ function goConfig() {
   renderConfig(uiRoot, state, {
     onBack: goMenu,
     onConfirm: () => goGame(),
+    onDashboard: goDashboard,
   });
+}
+
+function goDashboard() {
+  clearUI();
+  renderDashboard(uiRoot, state, {
+    onBack: goConfig,
+    onExportCSV: () => exportHistoryCSV(),
+  });
+}
+
+function exportHistoryCSV() {
+  const csv = state.exportHistoryCSV();
+  if (!csv) return;
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `historique-hercule-cerbere-${Date.now()}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 let gameHud = null;

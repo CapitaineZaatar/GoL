@@ -84,6 +84,17 @@ function buildCrowdTier(count, radius, y, gradientMap) {
   return { group, members: dummies };
 }
 
+function buildStepTread(radius, y, gradientMap) {
+  const mat = toonMaterial('#a97e52', gradientMap, { side: THREE.DoubleSide });
+  const geo = new THREE.RingGeometry(radius - 0.55, radius + 0.55, 40, 1, 0, Math.PI);
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.position.y = y;
+  mesh.receiveShadow = true;
+  return mesh;
+}
+
+
 export function initScene(canvas) {
   const scene = new THREE.Scene();
   const skyTex = createSkyTexture();
@@ -145,6 +156,13 @@ export function initScene(canvas) {
     const col = buildColumn(gradientMap);
     col.position.set(x, y, z);
     scene.add(col);
+  });
+
+  const treadRadii = [8.5, 9.8, 11.0];
+  treadRadii.forEach((radius, i) => {
+    const tread = buildStepTread(radius, 1.05 + i * 0.65, gradientMap);
+    tread.position.z = -4;
+    scene.add(tread);
   });
 
   const crowdTiers = [
