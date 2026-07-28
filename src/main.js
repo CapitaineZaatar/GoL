@@ -14,14 +14,14 @@ const state = new GameState();
 const { scene, gradientMap, resize, updateFrame, triggerCrowdReaction, kickCamera, render } = initScene(canvas);
 
 const hercules = createHercules(gradientMap);
-hercules.group.position.set(-1.7, 0, 0);
+hercules.group.position.set(-2, 0, 0);
 hercules.group.rotation.y = Math.PI / 2.5;
 addOutline(hercules.group);
 scene.add(hercules.group);
 
 const cerberus = createCerberus(gradientMap);
-const cerberusBaseX = 1.9;
-cerberus.group.position.set(cerberusBaseX, 0, 0);
+const cerberusBaseX = 3.4;
+cerberus.group.position.set(cerberusBaseX, 0, -0.4);
 addOutline(cerberus.group, { thickness: 0.05 });
 scene.add(cerberus.group);
 
