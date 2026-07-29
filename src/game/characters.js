@@ -138,37 +138,34 @@ export function createHercules(gradientMap) {
 
   group.traverse((obj) => { if (obj.isMesh) obj.castShadow = true; });
 
+  const REST_SHOULDER_X = 0.1;
+  const REST_ELBOW_X = 0.2;
+
   return {
     group, torsoPivot, hips,
     arms: { left: leftArm, right: rightArm },
+    /**
+     * API de rig générique : n'exprime que des angles de squelette, aucune
+     * connaissance d'un exercice précis. La chorégraphie par exercice vit
+     * dans src/game/movements/.
+     */
+    setArmPose(side, { shoulderX = REST_SHOULDER_X, shoulderZ = 0, elbowX = REST_ELBOW_X } = {}) {
+      const arm = side === 'left' ? leftArm : rightArm;
+      arm.shoulder.rotation.x = shoulderX;
+      arm.shoulder.rotation.z = shoulderZ;
+      arm.elbow.rotation.x = elbowX;
+    },
+    setTorsoPose({ leanX = 0 } = {}) {
+      torsoPivot.rotation.x = leanX;
+    },
+    setHipsPose({ z = 0 } = {}) {
+      hips.position.z = z;
+    },
     restPose() {
-      [leftArm, rightArm].forEach((arm) => {
-        arm.shoulder.rotation.x = 0.1;
-        arm.shoulder.rotation.z = 0;
-        arm.elbow.rotation.x = 0.2;
-      });
-      torsoPivot.rotation.x = 0;
-    },
-    setPullPose(t) {
-      const c = Math.min(1, Math.max(0, t));
-      [leftArm, rightArm].forEach((arm) => {
-        arm.shoulder.rotation.x = 0.1 - c * 2.1;
-        arm.shoulder.rotation.z = 0;
-        arm.elbow.rotation.x = 0.2 + c * 1.3;
-      });
-      torsoPivot.rotation.x = -c * 0.22;
-      hips.position.z = c * 0.12;
-    },
-    setLateralPose(t) {
-      const c = Math.min(1, Math.max(0, t));
-      const sides = [-1, 1];
-      [leftArm, rightArm].forEach((arm, i) => {
-        arm.shoulder.rotation.z = sides[i] * c * (Math.PI / 2) * 0.9;
-        arm.shoulder.rotation.x = 0.05;
-        arm.elbow.rotation.x = 0.12;
-      });
-      torsoPivot.rotation.x = c * 0.08;
-      hips.position.z = 0;
+      this.setArmPose('left');
+      this.setArmPose('right');
+      this.setTorsoPose();
+      this.setHipsPose();
     },
     handWorldPosition(side, out = new THREE.Vector3()) {
       const arm = side === 'left' ? leftArm : rightArm;
@@ -182,6 +179,9 @@ function head3Geometry() {
   const skull = new THREE.SphereGeometry(0.22, 10, 8);
   return skull;
 }
+
+/** Écartement latéral (rad) des deux têtes annexes de Cerbère au repos. Référence partagée avec les mouvements. */
+export const CERBERUS_SIDE_HEAD_REST_ANGLE = 0.72;
 
 export function createCerberus(gradientMap) {
   const furDark = toonMaterial('#3b2a2f', gradientMap);
@@ -274,8 +274,8 @@ export function createCerberus(gradientMap) {
   }
 
   const centerHead = buildHead(0, 1.08);
-  const leftHead = buildHead(-0.72, 0.85);
-  const rightHead = buildHead(0.72, 0.85);
+  const leftHead = buildHead(-CERBERUS_SIDE_HEAD_REST_ANGLE, 0.85);
+  const rightHead = buildHead(CERBERUS_SIDE_HEAD_REST_ANGLE, 0.85);
 
   const collarAnchor = new THREE.Object3D();
   collarAnchor.position.set(0, 1.05, 0.55);
@@ -287,35 +287,27 @@ export function createCerberus(gradientMap) {
 
   group.traverse((obj) => { if (obj.isMesh) obj.castShadow = true; });
 
-  const SIDE_HEAD_REST_ANGLE = 0.72;
-  const SIDE_HEAD_MAX_ANGLE = 1.4;
+  const headById = { center: centerHead, left: leftHead, right: rightHead };
 
   return {
     group, collarAnchor,
     heads: [centerHead, leftHead, rightHead],
+    /**
+     * API de rig générique : positionne un joint (cou) d'une tête donnée,
+     * aucune connaissance d'un exercice précis. La chorégraphie par exercice
+     * vit dans src/game/movements/.
+     */
+    setHeadRotation(headId, { x, y } = {}) {
+      const head = headById[headId];
+      if (!head) return;
+      if (x !== undefined) head.neckPivot.rotation.x = x;
+      if (y !== undefined) head.neckPivot.rotation.y = y;
+    },
     restPose() {
       group.position.z = 0;
-      this.heads.forEach((h) => { h.neckPivot.rotation.x = 0; });
-      leftHead.neckPivot.rotation.y = -SIDE_HEAD_REST_ANGLE;
-      rightHead.neckPivot.rotation.y = SIDE_HEAD_REST_ANGLE;
-    },
-    strain(t) {
-      const c = Math.min(1, Math.max(0, t));
-      this.heads.forEach((h, i) => {
-        h.neckPivot.rotation.x = -0.15 - c * 0.3 + Math.sin(Date.now() * 0.004 + i) * 0.03;
-      });
-    },
-    /** v in [-1, 1] : -1 = têtes écrasées vers le centre, 0 = repos, 1 = écartement maximal. */
-    setHeadSpread(v) {
-      const clamped = Math.max(-1, Math.min(1, v));
-      const angle = clamped >= 0
-        ? SIDE_HEAD_REST_ANGLE + clamped * (SIDE_HEAD_MAX_ANGLE - SIDE_HEAD_REST_ANGLE)
-        : SIDE_HEAD_REST_ANGLE * (1 + clamped);
-      leftHead.neckPivot.rotation.y = -angle;
-      rightHead.neckPivot.rotation.y = angle;
-    },
-    flinchCenter(intensity) {
-      centerHead.neckPivot.rotation.x = -0.1 - Math.max(0, intensity) * 0.55;
+      this.setHeadRotation('center', { x: 0 });
+      this.setHeadRotation('left', { x: 0, y: -CERBERUS_SIDE_HEAD_REST_ANGLE });
+      this.setHeadRotation('right', { x: 0, y: CERBERUS_SIDE_HEAD_REST_ANGLE });
     },
     lurch(intensity) {
       group.position.z = intensity * 0.35;

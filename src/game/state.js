@@ -1,9 +1,9 @@
+import { MOVEMENT_IDS, listMovementOptions } from './movements/index.js';
+
 const STORAGE_KEY = 'hc_qte_demo_profile_v1';
 
-export const MOVEMENTS = {
-  face_pull: { id: 'face_pull', label: 'Face-Pull (tirage horizontal épaule)' },
-  lateral_raise: { id: 'lateral_raise', label: 'Élévations latérales' },
-};
+/** Options { id, label } pour le <select> de l'écran de config, dérivées du registre unique des mouvements. */
+export const MOVEMENTS = listMovementOptions();
 
 export const UNLOCKS = [
   { xp: 0, id: 'arene_grece', label: 'Arène : Grèce Antique', type: 'Univers' },
@@ -15,7 +15,7 @@ export const UNLOCKS = [
 
 function defaultConfig() {
   return {
-    movement: 'face_pull',
+    movement: MOVEMENT_IDS[0],
     loadKg: 8,
     series: 3,
     reps: 12,
