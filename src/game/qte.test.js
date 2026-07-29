@@ -52,7 +52,7 @@ test('evaluateRelease: undershooting the angle is a miss with no penalty points'
   assert.equal(result.quality, 'bad');
   assert.equal(result.points, 0);
   assert.equal(result.zone, 'miss');
-  assert.match(result.message, /incomplète/);
+  assert.equal(result.messageKey, 'missLow');
 });
 
 test('evaluateRelease: overshooting the angle warns about the shoulder', () => {
@@ -60,7 +60,7 @@ test('evaluateRelease: overshooting the angle warns about the shoulder', () => {
   assert.equal(result.quality, 'bad');
   assert.equal(result.points, 0);
   assert.equal(result.zone, 'miss');
-  assert.match(result.message, /haut/);
+  assert.equal(result.messageKey, 'missHigh');
 });
 
 test('QTEEngine: press then release reports the angle and hold duration reached', () => {

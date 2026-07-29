@@ -1,9 +1,9 @@
 import './style.css';
-import * as THREE from 'three';
 import { GameState } from './game/state.js';
 import { initScene } from './game/scene.js';
-import { createHercules, createCerberus, buildChain } from './game/characters.js';
+import { createHercules, createCerberus } from './game/characters.js';
 import { addOutline } from './game/toon.js';
+import { createMovement } from './game/movements/index.js';
 import { QTEEngine, SWEEP_MAX_ANGLE } from './game/qte.js';
 import { renderMenu, renderConfig, renderGame, renderRecap, renderDashboard } from './game/ui.js';
 
@@ -25,15 +25,34 @@ cerberus.group.position.set(cerberusBaseX, 0, -0.4);
 addOutline(cerberus.group, { thickness: 0.05 });
 scene.add(cerberus.group);
 
-const chain = buildChain(gradientMap);
-scene.add(chain.group);
+const rig = { hercules, cerberus };
 
-const gripChainLeft = buildChain(gradientMap, { linkCount: 7, radius: 0.075, tube: 0.032 });
-const gripChainRight = buildChain(gradientMap, { linkCount: 7, radius: 0.075, tube: 0.032 });
-gripChainLeft.group.visible = false;
-gripChainRight.group.visible = false;
-scene.add(gripChainLeft.group);
-scene.add(gripChainRight.group);
+// Le mouvement actif possède seul la connaissance de l'exercice en cours
+// (pose, connecteurs visuels, narration, messages). Voir game/movements/README.md.
+let activeMovement = null;
+let connectors = {};
+
+function disposeConnectors() {
+  Object.values(connectors).forEach((connector) => {
+    scene.remove(connector.group);
+    connector.group.traverse((obj) => {
+      if (obj.isMesh) {
+        obj.geometry.dispose();
+        obj.material.dispose();
+      }
+    });
+  });
+  connectors = {};
+}
+
+function setActiveMovement(movementId) {
+  disposeConnectors();
+  activeMovement = createMovement(movementId);
+  connectors = activeMovement.buildConnectors(gradientMap);
+  Object.values(connectors).forEach((connector) => scene.add(connector.group));
+}
+
+setActiveMovement(state.config.movement);
 
 function resizeAll() { resize(); }
 window.addEventListener('resize', resizeAll);
@@ -44,10 +63,7 @@ let poseTarget = 0;
 let lurch = 0;
 let retreat = 0;
 let impactPulse = 0;
-let crashPulse = 0;
 let repCounter = 0;
-
-function isLateral() { return state.config.movement === 'lateral_raise'; }
 
 function animate(now) {
   const dt = Math.min(48, now - (animate.last || now));
@@ -66,31 +82,10 @@ function animate(now) {
     hercules.group.scale.setScalar(bounce);
   }
 
-  if (isLateral()) {
-    hercules.setLateralPose(poseCurrent);
-    let headSpreadValue = poseCurrent;
-    if (crashPulse > 0) {
-      crashPulse = Math.max(0, crashPulse - dt * 0.0035);
-      headSpreadValue = -Math.sin(crashPulse * Math.PI);
-      cerberus.flinchCenter(Math.sin(crashPulse * Math.PI));
-    }
-    cerberus.setHeadSpread(headSpreadValue);
-
-    const handL = hercules.handWorldPosition('left');
-    const handR = hercules.handWorldPosition('right');
-    const headL = cerberus.headWorldPosition('left');
-    const headR = cerberus.headWorldPosition('right');
-    gripChainLeft.update(handL, headL);
-    gripChainRight.update(handR, headR);
-  } else {
-    hercules.setPullPose(poseCurrent);
-    cerberus.strain(poseCurrent);
-    const handR = hercules.handWorldPosition('right');
-    const handL = hercules.handWorldPosition('left');
-    const mid = handR.add(handL).multiplyScalar(0.5);
-    const collarPos = cerberus.collarWorldPosition();
-    chain.update(mid, collarPos);
-  }
+  const anchors = activeMovement.animate(poseCurrent, dt, rig);
+  Object.entries(anchors).forEach(([connectorId, [from, to]]) => {
+    connectors[connectorId]?.update(from, to);
+  });
 
   render();
   requestAnimationFrame(animate);
@@ -100,11 +95,8 @@ requestAnimationFrame(animate);
 function clearUI() { uiRoot.innerHTML = ''; }
 
 function goMenu() {
-  poseTarget = 0; retreat = 0; lurch = 0; crashPulse = 0;
+  poseTarget = 0; retreat = 0; lurch = 0;
   setCameraPreset(0);
-  chain.group.visible = true;
-  gripChainLeft.group.visible = false;
-  gripChainRight.group.visible = false;
   clearUI();
   renderMenu(uiRoot, state, {
     onStart: goConfig,
@@ -165,22 +157,14 @@ let repTimer = null;
 function goGame() {
   clearUI();
   state.startSession();
-  poseTarget = 0; retreat = 0; lurch = 0; crashPulse = 0; repCounter = 0;
+  setActiveMovement(state.config.movement);
+  poseTarget = 0; retreat = 0; lurch = 0; repCounter = 0;
   gameHud = renderGame(uiRoot, state);
   gameHud.setCounter(1, state.config.series, 0);
   gameHud.setGauge(0);
-  cerberus.restPose();
-  hercules.restPose();
+  activeMovement.restPose(rig);
   setCameraPreset(0);
-
-  const lateral = isLateral();
-  chain.group.visible = !lateral;
-  gripChainLeft.group.visible = lateral;
-  gripChainRight.group.visible = lateral;
-
-  gameHud.setSubtitle(lateral
-    ? 'Hercule empoigne les deux têtes de Cerbère… la troisième gronde au centre.'
-    : 'Hercule empoigne la chaîne… Cerbère s’éveille.');
+  gameHud.setSubtitle(activeMovement.narrative.grip);
 
   unbindPull = gameHud.bindPull({
     onPressStart: () => { if (qte) { qte.pressStart(); gameHud.setPressed(true); } },
@@ -193,9 +177,7 @@ function goGame() {
   });
 
   repTimer = setTimeout(() => {
-    gameHud.setSubtitle(lateral
-      ? '« Hercule, écarte-les bien droit... puis frappe les têtes l’une contre l’autre ! »'
-      : '« Hercule, retiens Cerbère ! Tire fort... mais sans à-coups ! »');
+    gameHud.setSubtitle(activeMovement.narrative.cue);
     repTimer = setTimeout(startRep, 2600);
   }, 1400);
 }
@@ -220,7 +202,8 @@ function qteFrame(dt) {
 function handleRepResult(result) {
   qte = null;
   state.recordRep(result);
-  gameHud.flashFeedback(result.quality, result.message);
+  const message = activeMovement.messages[result.messageKey] ?? '';
+  gameHud.flashFeedback(result.quality, message);
   gameHud.setCounter(state.session.currentSeries, state.config.series, state.session.score);
 
   const maxPossible = state.session.totalReps * 10;
@@ -239,9 +222,7 @@ function handleRepResult(result) {
     impactPulse = result.quality === 'perfect' ? 1 : 0.5;
   }
 
-  if (isLateral()) {
-    crashPulse = 1;
-  }
+  activeMovement.onRepEnd(result, rig);
 
   poseTarget = 0;
 
@@ -269,7 +250,7 @@ function goRecap() {
   if (unbindPull) { unbindPull(); unbindPull = null; }
   clearTimeout(repTimer);
   qte = null;
-  poseTarget = 0; lurch = 0; crashPulse = 0;
+  poseTarget = 0; lurch = 0;
   setCameraPreset(0);
   const { entry, progressPct } = state.finishSession();
   renderRecap(uiRoot, state, { entry, progressPct }, {

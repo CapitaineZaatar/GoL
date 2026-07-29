@@ -44,7 +44,7 @@ export function renderConfig(container, state, { onBack, onConfirm, onDashboard 
         <div class="field">
           <label>Mouvement</label>
           <select id="cfg-movement">
-            ${Object.values(MOVEMENTS).map((m) => `<option value="${m.id}" ${m.id === cfg.movement ? 'selected' : ''}>${m.label}</option>`).join('')}
+            ${MOVEMENTS.map((m) => `<option value="${m.id}" ${m.id === cfg.movement ? 'selected' : ''}>${m.label}</option>`).join('')}
           </select>
         </div>
 
@@ -257,6 +257,7 @@ export function renderRecap(container, state, { entry, progressPct }, { onExport
   entry.repsLog.forEach((r) => { tally[r.quality] = (tally[r.quality] || 0) + 1; });
 
   const next = state.nextUnlock();
+  const movementLabel = MOVEMENTS.find((m) => m.id === entry.config.movement)?.label ?? entry.config.movement;
   const progressLine = progressPct === null
     ? 'Première séance enregistrée — sers de référence pour la suite !'
     : progressPct >= 0
@@ -267,7 +268,7 @@ export function renderRecap(container, state, { entry, progressPct }, { onExport
     <div class="screen recap-screen">
       <div class="panel">
         <h2>Quête accomplie</h2>
-        <div class="kicker">Hercule vs Cerbère — Face-Pull</div>
+        <div class="kicker">Hercule vs Cerbère — ${movementLabel}</div>
         <div class="recap-score">${entry.score} points</div>
         <div class="recap-tagline">${progressLine}</div>
 

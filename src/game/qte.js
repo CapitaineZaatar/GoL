@@ -47,7 +47,7 @@ export class QTEEngine {
         speedQuality: 'none',
         angle: 0,
         holdMs: 0,
-        message: 'Trop lent ! Cerbère t’a échappé, il faut réagir plus tôt.',
+        messageKey: 'timeout',
       };
     }
     return null;
@@ -72,6 +72,12 @@ export class QTEEngine {
   }
 }
 
+/**
+ * Évalue une répétition. Ne retourne que des faits mécaniques (zone, vitesse,
+ * points) et une `messageKey` neutre — jamais de texte. Le texte affiché au
+ * patient est propre à chaque exercice et vit dans le dictionnaire
+ * `messages` du mouvement actif (voir src/game/movements/).
+ */
 export function evaluateRelease(tolerance, angle, holdMs) {
   const center = (tolerance.angleMin + tolerance.angleMax) / 2;
   const dist = Math.abs(angle - center);
@@ -88,24 +94,22 @@ export function evaluateRelease(tolerance, angle, holdMs) {
   else speedQuality = 'ok';
 
   if (zone === 'miss') {
-    const message = angle > tolerance.angleMax
-      ? 'Angle trop haut ! Attention à l’épaule.'
-      : 'Traction incomplète, va jusqu’à la zone.';
-    return { points: 0, quality: 'bad', zone, speedQuality, angle, holdMs, message };
+    const messageKey = angle > tolerance.angleMax ? 'missHigh' : 'missLow';
+    return { points: 0, quality: 'bad', zone, speedQuality, angle, holdMs, messageKey };
   }
 
   if (speedQuality === 'jerk') {
-    return { points: 3, quality: 'acceptable', zone, speedQuality, angle, holdMs, message: 'À-coup ! Tire plus régulièrement.' };
+    return { points: 3, quality: 'acceptable', zone, speedQuality, angle, holdMs, messageKey: 'jerk' };
   }
   if (speedQuality === 'slow') {
-    return { points: 3, quality: 'acceptable', zone, speedQuality, angle, holdMs, message: 'Trop lent, garde la tension.' };
+    return { points: 3, quality: 'acceptable', zone, speedQuality, angle, holdMs, messageKey: 'slow' };
   }
 
   if (zone === 'perfect') {
-    return { points: 10, quality: 'perfect', zone, speedQuality, angle, holdMs, message: 'Mouvement parfait !' };
+    return { points: 10, quality: 'perfect', zone, speedQuality, angle, holdMs, messageKey: 'perfect' };
   }
   if (zone === 'good') {
-    return { points: 7, quality: 'good', zone, speedQuality, angle, holdMs, message: 'Bonne traction !' };
+    return { points: 7, quality: 'good', zone, speedQuality, angle, holdMs, messageKey: 'good' };
   }
-  return { points: 3, quality: 'acceptable', zone, speedQuality, angle, holdMs, message: 'Acceptable, reste régulier.' };
+  return { points: 3, quality: 'acceptable', zone, speedQuality, angle, holdMs, messageKey: 'acceptable' };
 }
